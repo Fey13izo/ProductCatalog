@@ -1,33 +1,59 @@
-  // In settings.gradle (CORRECT ORDER)
-    
-    // 1. The pluginManagement block MUST be the first block in the file.
-    pluginManagement {
-    repositories {
-    google()
-    mavenCentral()
-    gradlePluginPortal()
-  }
-  }
-    
-    // 2. All other blocks, like toolchainManagement, come AFTER pluginManagement.
-    toolchainManagement {
-    jvm {
-    javaRepositories {
-    repository("foojay") {
-    // The Foojay VDC is a trusted source for discovering JDKs
-    url = "https://api.foojay.io/disco/v3.0/"
-  }
-  }
-  }
-  }
-    
-    // The rest of your settings file
-    dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-    google()
-    mavenCentral()
-  }
-  }
-    rootProject.name = "ProductCatalog"
-    include ':app'
+# .circleci/config.yml (Final, Validated YAML)
+version: 2.1
+
+jobs:
+  build:
+    # This docker image is known to have multiple JDKs
+    docker:
+      - image: cimg/android:2023.09
+
+    # This sets the working directory for all subsequent steps in the job
+    working_directory: ~/project
+
+    # THIS IS THE KEY FIX: Define the Java version for the ENTIRE job's environment.
+    # This ensures every command in every step uses the correct JDK.
+    # The indentation of this 'environment' block is critical.
+    environment:
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+
+    steps:
+      # Step 1: Get the code from the repository
+      - checkout
+
+      # Step 2: Restore cache to speed up subsequent builds (optional but highly recommended)
+      - restore_cache:
+          keys:
+            - gradle-wrapper-v1-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+            - gradle-cache-v1-{{ checksum "build.gradle" }}-{{ checksum "app/build.gradle" }}
+
+      # Step 3: Grant execute permissions to the Gradle wrapper script
+      - run:
+          name: Grant Permissions
+          command: chmod +x ./gradlew
+
+      # Step 4: Verify the Java version is correct BEFORE running Gradle
+      - run:
+          name: Verify Java Version
+          command: java -version
+
+      # Step 5: Run your Gradle tasks. They will now inherit the correct JAVA_HOME.
+      - run:
+          name: Download Dependencies and Build
+          command: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      # Step 6: Save the downloaded dependencies to the cache for the next run
+      - save_cache:
+          key: gradle-wrapper-v1-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+          paths:
+            - ~/.gradle/wrapper
+      - save_cache:
+          key: gradle-cache-v1-{{ checksum "build.gradle" }}-{{ checksum "app/build.gradle" }}
+          paths:
+            - ~/.gradle/caches
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - build
+  
