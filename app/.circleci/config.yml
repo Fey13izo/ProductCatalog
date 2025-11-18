@@ -1,78 +1,69 @@
-yml
-version: 2.1 # It's good practice to use version 2.1 for access to modern features
+  yml
+  version: 2.1
 
-jobs:
-  build:
-    # Use a modern Android image from CircleCI's "cimg" set
-    docker:
-      - image: cimg/android:2023.09
+  jobs:
+    build:
+      # Use a modern Android image that is known to have JDK 17
+      docker:
+        - image: cimg/android:2023.09
 
-    # Set the working directory for all subsequent steps
-    working_directory: ~/project
+      working_directory: ~/project
 
-    steps:
-      # Step 1: Get the code from your repository
-      - checkout
+      steps:
+        - checkout
 
-      # Step 2: Restore Gradle cache to speed up builds
-      # This checks for previously saved dependencies.
-      - restore_cache:
-          key: gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+        # Restore caches for faster builds
+        - restore_cache:
+            keys:
+              - gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+              - gradle-cache-{{ checksum "build.gradle" }}-{{ checksum "app/build.gradle" }}
 
-      - restore_cache:
-          key: gradle-cache-{{ checksum "build.gradle" }}-{{ checksum "app/build.gradle" }}
+        # Grant execute permissions to the Gradle wrapper
+        - run:
+            name: Grant Permissions
+            command: chmod +x ./gradlew
 
-      # Step 3: THIS IS THE FIX. Switch to the correct Java version.
-      # The cimg/android images have JDK 17 pre-installed.
-      - run:
-          name: Set Java 17 as default
-          command: |
-            sudo update-java-alternatives --set /usr/lib/jvm/java-1.17.0-openjdk-amd64
-            echo 'export JAVA_HOME=/usr/lib/jvm/java-1.17.0-openjdk-amd64' >> $BASH_ENV
-            source $BASH_ENV
-            java -version # Verify that Java 17 is now active
+        # --- THIS IS THE NEW, MORE FORCEFUL APPROACH ---
+        # Define the correct JAVA_HOME once as an environment variable for subsequent steps.
+        - run:
+            name: Set and Verify JAVA_HOME
+            command: |
+              echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> $BASH_ENV
+              source $BASH_ENV
+              echo "JAVA_HOME is now set to: $JAVA_HOME"
+              java -version
 
-      # Step 4: Grant execute permissions to the Gradle wrapper
-      - run:
-          name: Grant Permissions
-          command: chmod +x ./gradlew
+        # Run Gradle commands. They will now automatically pick up the JAVA_HOME set in the previous step.
+        - run:
+            name: Download Dependencies
+            command: ./gradlew androidDependencies --no-daemon --stacktrace
 
-      # Step 5: Download dependencies. This will run faster if the cache was restored.
-      - run:
-          name: Download Dependencies
-          command: ./gradlew androidDependencies --no-daemon
+        - run:
+            name: Build App
+            command: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      # Step 6: Save the downloaded dependencies to the cache for future builds
-      - save_cache:
-          key: gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-          paths:
-            - ~/.gradle/wrapper
-      - save_cache:
-          key: gradle-cache-{{ checksum "build.gradle" }}-{{ checksum "app/build.gradle" }}
-          paths:
-            - ~/.gradle/caches
+        - run:
+            name: Run Unit Tests
+            command: ./gradlew testDebugUnitTest --no-daemon --stacktrace
 
-      # Step 7: Build the debug APK
-      - run:
-          name: Build App
-          command: ./gradlew assembleDebug --no-daemon --stacktrace
+        # Save caches for future builds
+        - save_cache:
+            key: gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+            paths:
+              - ~/.gradle/wrapper
+        - save_cache:
+            key: gradle-cache-{{ checksum "build.gradle" }}-{{ checksum "app/build.gradle" }}
+            paths:
+              - ~/.gradle/caches
 
-      # Step 8: Run unit tests
-      - run:
-          name: Run Unit Tests
-          command: ./gradlew testDebugUnitTest --no-daemon --stacktrace
+        # Store artifacts and test results
+        - store_artifacts:
+            path: app/build/outputs/apk/debug
+            destination: apks
+        - store_test_results:
+            path: app/build/test-results
 
-      # Optional: Store build artifacts (like the APK) so you can download them
-      - store_artifacts:
-          path: app/build/outputs/apk/debug
-          destination: apks
-
-      # Optional: Store test results for better insights in the CircleCI UI
-      - store_test_results:
-          path: app/build/test-results
-
-workflows:
-  build_and_test:
-    jobs:
-      - build
-
+  workflows:
+    build_and_test:
+      jobs:
+        - build
