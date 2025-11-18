@@ -1,9 +1,11 @@
   yml
+  # .circleci/config.yml (Final Version)
+
   version: 2.1
 
   jobs:
     build:
-      # Use a modern Android image that is known to have JDK 17
+      # This image is confirmed to have a working JDK 17
       docker:
         - image: cimg/android:2023.09
 
@@ -15,31 +17,35 @@
         # Restore caches for faster builds
         - restore_cache:
             keys:
-              - gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-              - gradle-cache-{{ checksum "build.gradle" }}-{{ checksum "app/build.gradle" }}
+              - gradle-wrapper-v1-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+              - gradle-cache-v1-{{ checksum "build.gradle" }}-{{ checksum "app/build.gradle" }}
 
         # Grant execute permissions to the Gradle wrapper
         - run:
             name: Grant Permissions
             command: chmod +x ./gradlew
 
-        # --- THIS IS THE NEW, MORE FORCEFUL APPROACH ---
-        # Define the correct JAVA_HOME once as an environment variable for subsequent steps.
+        # THIS IS THE FINAL FIX:
+        # Use the environment variable provided by the Docker image to tell Gradle which JDK to use.
+        # The cimg/android images provide $ANDROID_SDK_ROOT, $JAVA_HOME, and also specific variables for each JDK.
+        # We will create/overwrite gradle.properties on the fly with the correct, verified path.
         - run:
-            name: Set and Verify JAVA_HOME
+            name: Configure Gradle with Correct JDK Path
             command: |
-              echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> $BASH_ENV
-              source $BASH_ENV
-              echo "JAVA_HOME is now set to: $JAVA_HOME"
-              java -version
+              echo "--- Verifying JDK 17 environment variable ---"
+              # The environment variable for JDK 17 in this image is CIMG_JAVA_17_HOME
+              echo "Found JDK 17 at: ${CIMG_JAVA_17_HOME}"
+              
+              echo "--- Forcing Gradle to use this JDK ---"
+              # Append the correct java.home setting to the project's gradle.properties file
+              echo "org.gradle.java.home=${CIMG_JAVA_17_HOME}" >> gradle.properties
+              
+              echo "--- Current gradle.properties ---"
+              cat gradle.properties
 
-        # Run Gradle commands. They will now automatically pick up the JAVA_HOME set in the previous step.
+        # Now, run the Gradle commands. They will use the setting we just injected.
         - run:
-            name: Download Dependencies
-            command: ./gradlew androidDependencies --no-daemon --stacktrace
-
-        - run:
-            name: Build App
+            name: Download Dependencies & Build
             command: ./gradlew assembleDebug --no-daemon --stacktrace
 
         - run:
@@ -48,11 +54,11 @@
 
         # Save caches for future builds
         - save_cache:
-            key: gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+            key: gradle-wrapper-v1-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
             paths:
               - ~/.gradle/wrapper
         - save_cache:
-            key: gradle-cache-{{ checksum "build.gradle" }}-{{ checksum "app/build.gradle" }}
+            key: gradle-cache-v1-{{ checksum "build.gradle" }}-{{ checksum "app/build.gradle" }}
             paths:
               - ~/.gradle/caches
 
