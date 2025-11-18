@@ -4,6 +4,7 @@ plugins {
     id 'com.google.gms.google-services'
 }
 android {
+
     namespace 'mgarzon.createbest.productcatalog'
     compileSdkVersion 34
     defaultConfig {
