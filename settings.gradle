@@ -1,7 +1,6 @@
-// In settings.gradle (CORRECT ORDER)
+// In settings.gradle
 
-// 1. The pluginManagement block MUST be the first block in the file.
-
+// The pluginManagement block MUST be the first block in the file.
 pluginManagement {
     repositories {
         google()
@@ -10,13 +9,16 @@ pluginManagement {
     }
 }
 
+// The 'toolchainManagement' block has been REMOVED as it was causing build errors.
 
+// The dependencyResolutionManagement block defines where your app's libraries are found.
+// The strict 'repositoriesMode' has been REMOVED to prevent conflicts.
 dependencyResolutionManagement {
-    // These repositories are for your app's dependencies (e.g., androidx, firebase-database).
     repositories {
         google()
         mavenCentral()
     }
 }
+
 rootProject.name = "ProductCatalog"
 include ':app'
