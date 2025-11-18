@@ -1,1 +1,22 @@
+// In settings.gradle (CORRECT ORDER)
+
+// 1. The pluginManagement block MUST be the first block in the file.
+
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+
+dependencyResolutionManagement {
+    // These repositories are for your app's dependencies (e.g., androidx, firebase-database).
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "ProductCatalog"
 include ':app'

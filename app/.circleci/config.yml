@@ -1,75 +1,33 @@
-  yml
-  # .circleci/config.yml (Final Version)
-
-  version: 2.1
-
-  jobs:
-    build:
-      # This image is confirmed to have a working JDK 17
-      docker:
-        - image: cimg/android:2023.09
-
-      working_directory: ~/project
-
-      steps:
-        - checkout
-
-        # Restore caches for faster builds
-        - restore_cache:
-            keys:
-              - gradle-wrapper-v1-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-              - gradle-cache-v1-{{ checksum "build.gradle" }}-{{ checksum "app/build.gradle" }}
-
-        # Grant execute permissions to the Gradle wrapper
-        - run:
-            name: Grant Permissions
-            command: chmod +x ./gradlew
-
-        # THIS IS THE FINAL FIX:
-        # Use the environment variable provided by the Docker image to tell Gradle which JDK to use.
-        # The cimg/android images provide $ANDROID_SDK_ROOT, $JAVA_HOME, and also specific variables for each JDK.
-        # We will create/overwrite gradle.properties on the fly with the correct, verified path.
-        - run:
-            name: Configure Gradle with Correct JDK Path
-            command: |
-              echo "--- Verifying JDK 17 environment variable ---"
-              # The environment variable for JDK 17 in this image is CIMG_JAVA_17_HOME
-              echo "Found JDK 17 at: ${CIMG_JAVA_17_HOME}"
-              
-              echo "--- Forcing Gradle to use this JDK ---"
-              # Append the correct java.home setting to the project's gradle.properties file
-              echo "org.gradle.java.home=${CIMG_JAVA_17_HOME}" >> gradle.properties
-              
-              echo "--- Current gradle.properties ---"
-              cat gradle.properties
-
-        # Now, run the Gradle commands. They will use the setting we just injected.
-        - run:
-            name: Download Dependencies & Build
-            command: ./gradlew assembleDebug --no-daemon --stacktrace
-
-        - run:
-            name: Run Unit Tests
-            command: ./gradlew testDebugUnitTest --no-daemon --stacktrace
-
-        # Save caches for future builds
-        - save_cache:
-            key: gradle-wrapper-v1-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-            paths:
-              - ~/.gradle/wrapper
-        - save_cache:
-            key: gradle-cache-v1-{{ checksum "build.gradle" }}-{{ checksum "app/build.gradle" }}
-            paths:
-              - ~/.gradle/caches
-
-        # Store artifacts and test results
-        - store_artifacts:
-            path: app/build/outputs/apk/debug
-            destination: apks
-        - store_test_results:
-            path: app/build/test-results
-
-  workflows:
-    build_and_test:
-      jobs:
-        - build
+  // In settings.gradle (CORRECT ORDER)
+    
+    // 1. The pluginManagement block MUST be the first block in the file.
+    pluginManagement {
+    repositories {
+    google()
+    mavenCentral()
+    gradlePluginPortal()
+  }
+  }
+    
+    // 2. All other blocks, like toolchainManagement, come AFTER pluginManagement.
+    toolchainManagement {
+    jvm {
+    javaRepositories {
+    repository("foojay") {
+    // The Foojay VDC is a trusted source for discovering JDKs
+    url = "https://api.foojay.io/disco/v3.0/"
+  }
+  }
+  }
+  }
+    
+    // The rest of your settings file
+    dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+    google()
+    mavenCentral()
+  }
+  }
+    rootProject.name = "ProductCatalog"
+    include ':app'
