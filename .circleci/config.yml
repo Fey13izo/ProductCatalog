@@ -6,6 +6,7 @@ jobs:
       - image: cimg/android:2025.11
     environment:
       JVM_OPTS: -Xmx3200m
+      JDK_VERSION: 17
     steps:
       - checkout
       - restore_cache:
