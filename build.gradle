@@ -1,18 +1,9 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
+// DO NOT ADD PLUGINS HERE. They are managed in settings.gradle
+// The 'buildscript' block has been removed as it is legacy.
 
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.1.2'
-        classpath 'com.google.gms:google-services:4.4.0'
-    }
-}
-
-
+// You can define a clean task if you wish, but it's often not necessary.
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
