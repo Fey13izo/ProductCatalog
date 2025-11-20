@@ -1,9 +1,9 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
-// DO NOT ADD PLUGINS HERE. They are managed in settings.gradle
-// The 'buildscript' block has been removed as it is legacy.
+// DO NOT declare repositories or dependencies in a 'buildscript' block here.// They are all managed centrally in settings.gradle and app/build.gradle.
 
-// You can define a clean task if you wish, but it's often not necessary.
+// You can keep the clean task if you wish, it does no harm.
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+

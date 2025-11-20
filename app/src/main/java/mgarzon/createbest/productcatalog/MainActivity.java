@@ -1,17 +1,8 @@
-// In app/src/main/java/mgarzon/createbest/productcatalog/MainActivity.java
-
 package mgarzon.createbest.productcatalog;
 
-// IMPORT STATEMENTS HAVE BEEN CORRECTED TO USE 'androidx'
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-
 import android.os.Bundle;
-import android.text.TextUtils;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
@@ -24,136 +15,108 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
-import java.util.List;
 
-// This class now correctly extends the androidx version of AppCompatActivity
 public class MainActivity extends AppCompatActivity {
 
-    EditText editTextName;
-    EditText editTextPrice;
-    Button buttonAddProduct;
-    ListView listViewProducts;
+    // UI Components
+    private EditText editTextName;
+    private EditText editTextPrice;
+    private Button addButton;
+    private ListView listViewProducts;
 
-    List<Product> products;
+    // Firebase
+    private DatabaseReference databaseReference;
 
-    DatabaseReference databaseProducts;
+    // Data Structure for ListView
+    private ArrayList<String> productList;
+    private ArrayAdapter<String> adapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        databaseProducts = FirebaseDatabase.getInstance().getReference("products");
+        // Initialize UI components using the IDs from your XML
         editTextName = findViewById(R.id.editTextName);
         editTextPrice = findViewById(R.id.editTextPrice);
+        addButton = findViewById(R.id.addButton);
         listViewProducts = findViewById(R.id.listViewProducts);
-        buttonAddProduct = findViewById(R.id.addButton);
 
-        products = new ArrayList<>();
+        // Initialize Firebase reference
+        databaseReference = FirebaseDatabase.getInstance().getReference("products");
 
-        buttonAddProduct.setOnClickListener(view -> addProduct());
+        // Initialize list and adapter
+        productList = new ArrayList<>();
+        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, productList);
+        listViewProducts.setAdapter(adapter);
 
-        listViewProducts.setOnItemLongClickListener((adapterView, view, i, l) -> {
-            Product product = products.get(i);
-            showUpdateDeleteDialog(product.getId(), product.getProductName());
-            return true;
-        });
+        // Set button click listener
+        addButton.setOnClickListener(v -> addProduct());
+
+        // Load products from Firebase
+        loadProducts();
     }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-        databaseProducts.addValueEventListener(new ValueEventListener() {
+    /**
+     * Load all products from Firebase and display in the ListView
+     */
+    private void loadProducts() {
+        databaseReference.addValueEventListener(new ValueEventListener() {
             @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                products.clear();
-                for (DataSnapshot postSnapshot : dataSnapshot.getChildren()) {
-                    Product product = postSnapshot.getValue(Product.class);
-                    products.add(product);
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                productList.clear();
+
+                for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                    // Assumes you have a Product.java class
+                    Product product = snapshot.getValue(Product.class);
+                    if (product != null) {
+                        String productInfo = "Name: " + product.getProductName() + "\n" +
+                                "Price: $" + String.format("%.2f", product.getPrice());
+                        productList.add(productInfo);
+                    }
                 }
-                ProductList productsAdapter = new ProductList(MainActivity.this, products);
-                listViewProducts.setAdapter(productsAdapter);
+                adapter.notifyDataSetChanged();
             }
 
             @Override
-            public void onCancelled(@NonNull DatabaseError databaseError) {
-                // It's good practice to log errors
-                Toast.makeText(MainActivity.this, "Failed to load products: " + databaseError.getMessage(), Toast.LENGTH_SHORT).show();
+            public void onCancelled(DatabaseError databaseError) {
+                Toast.makeText(MainActivity.this, "Failed to load products: " + databaseError.getMessage(), Toast.LENGTH_LONG).show();
             }
         });
     }
 
-    private void showUpdateDeleteDialog(final String productId, String productName) {
-        AlertDialog.Builder dialogBuilder = new AlertDialog.Builder(this);
-        LayoutInflater inflater = getLayoutInflater();
-        final View dialogView = inflater.inflate(R.layout.update_dialog, null);
-        dialogBuilder.setView(dialogView);
-
-        final EditText editTextName = dialogView.findViewById(R.id.editTextName);
-        final EditText editTextPrice  = dialogView.findViewById(R.id.editTextPrice);
-        final Button buttonUpdate = dialogView.findViewById(R.id.buttonUpdateProduct);
-        final Button buttonDelete = dialogView.findViewById(R.id.buttonDeleteProduct);
-
-        dialogBuilder.setTitle(productName);
-        final AlertDialog b = dialogBuilder.create();
-        b.show();
-
-        buttonUpdate.setOnClickListener(view -> {
-            String name = editTextName.getText().toString().trim();
-            String priceStr = editTextPrice.getText().toString();
-            if (!TextUtils.isEmpty(name) && !TextUtils.isEmpty(priceStr)) {
-                try {
-                    double price = Double.parseDouble(priceStr);
-                    updateProduct(productId, name, price);
-                    b.dismiss();
-                } catch (NumberFormatException e) {
-                    Toast.makeText(MainActivity.this, "Please enter a valid price", Toast.LENGTH_SHORT).show();
-                }
-            } else {
-                Toast.makeText(MainActivity.this, "Please fill out all fields", Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        buttonDelete.setOnClickListener(view -> {
-            deleteProduct(productId);
-            b.dismiss();
-        });
-    }
-
-    private void updateProduct(String id, String name, double price) {
-        DatabaseReference dR = FirebaseDatabase.getInstance().getReference("products").child(id);
-        Product product = new Product(id, name, price);
-        dR.setValue(product);
-        Toast.makeText(getApplicationContext(), "Product Updated", Toast.LENGTH_LONG).show();
-    }
-
-    private boolean deleteProduct(String id) {
-        DatabaseReference dR = FirebaseDatabase.getInstance().getReference("products").child(id);
-        dR.removeValue();
-        Toast.makeText(getApplicationContext(), "Product Deleted", Toast.LENGTH_LONG).show();
-        return true;
-    }
-
+    /**
+     * Add a new product to Firebase
+     */
     private void addProduct() {
-        String name = editTextName.getText().toString().trim();
+        String productName = editTextName.getText().toString().trim();
         String priceStr = editTextPrice.getText().toString().trim();
 
-        if (!TextUtils.isEmpty(name) && !TextUtils.isEmpty(priceStr)) {
-            try {
-                double price = Double.parseDouble(priceStr);
-                String id = databaseProducts.push().getKey();
-                Product product = new Product(id, name, price);
-                if (id != null) {
-                    databaseProducts.child(id).setValue(product);
-                }
-                editTextName.setText("");
-                editTextPrice.setText("");
-                Toast.makeText(this, "Product added", Toast.LENGTH_LONG).show();
-            } catch (NumberFormatException e) {
-                Toast.makeText(this, "Please enter a valid price", Toast.LENGTH_SHORT).show();
+        if (productName.isEmpty() || priceStr.isEmpty()) {
+            Toast.makeText(this, "Please enter product name and price", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            double price = Double.parseDouble(priceStr);
+            String productId = databaseReference.push().getKey();
+
+            // The Product.java class should have a constructor like this
+            Product product = new Product(productName, price);
+
+            if (productId != null) {
+                databaseReference.child(productId).setValue(product)
+                        .addOnSuccessListener(aVoid -> {
+                            Toast.makeText(this, "Product added successfully", Toast.LENGTH_SHORT).show();
+                            // Clear the input fields after successful addition
+                            editTextName.setText("");
+                            editTextPrice.setText("");
+                        })
+                        .addOnFailureListener(e -> Toast.makeText(this, "Failed to add product.", Toast.LENGTH_SHORT).show());
             }
-        } else {
-            Toast.makeText(this, "Please enter a name and price", Toast.LENGTH_LONG).show();
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "Invalid price format", Toast.LENGTH_SHORT).show();
         }
     }
 }
+
