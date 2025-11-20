@@ -1,14 +1,9 @@
 // app/build.gradle
 
-// The 'plugins' block is the modern way to apply plugins.
-// It uses the versions defined in the project's settings.gradle.
 plugins {
-    id 'com.android.application' version '8.1.2' apply false
-    id 'com.google.gms.google-services' version '4.4.0' apply false
+    id 'com.android.application' version '8.1.2'
+    id 'com.google.gms.google-services' version '4.4.0'
 }
-
-apply plugin: 'com.android.application'
-apply plugin: 'com.google.gms.google-services'
 
 android {
     namespace 'mgarzon.createbest.productcatalog'
@@ -16,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId "mgarzon.createbest.productcatalog"
-        minSdk 23 // Kept at 23 to satisfy Firebase requirements
+        minSdk 23
         targetSdk 34
         versionCode 1
         versionName "1.0"
@@ -30,6 +25,7 @@ android {
         }
     }
 
+    // We MUST target Java 17 for AGP 8.1.2
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -45,4 +41,3 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }
-
